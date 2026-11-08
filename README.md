@@ -10,7 +10,7 @@ Banks lose money when they approve loans that end up defaulting. The goal here w
 
 148,670 real mortgage records with 31 features, including loan amount, income, credit score, property value, and loan-to-value ratio. The target column, `Status`, marks whether the loan defaulted.
 
-The dataset isn't included in this repo because of its size. You can download it from Kaggle here: [add Kaggle link]
+The dataset isn't included in this repo because of its size. You can download it from Kaggle here: [https://www.kaggle.com/datasets/yasserh/loan-default-dataset]
 
 ## What I Did
 
