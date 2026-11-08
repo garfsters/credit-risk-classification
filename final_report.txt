@@ -1,0 +1,99 @@
+Credit Risk Classification Using Loan Application Data
+Final Conclusion Report
+Introduction to Deep Learning | Spring 2026
+
+OBJECTIVE
+---------------------
+The goal of this project was to build a supervised machine learning classifier that predicts whether a 
+loan applicant is high-risk (likely to default) or low-risk (likely to repay) based on their financial, 
+demographic, and loan characteristics. Credit risk classification is a critical function in banking and 
+financial institutions, and accurate predictions directly inform loan approval decisions, minimize 
+financial losses, and improve risk management strategies.
+
+DATASET
+----------------------
+I used the Loan Default Dataset from Kaggle, which comes from real Home Mortgage Disclosure Act (HMDA) 
+records. It had 148,670 loan applications and 34 columns covering things like applicant age, income, 
+credit score, loan amount, property value, and loan type. The target variable was Status: 1 for default, 
+0 for no default.
+
+One thing I want to flag: a lot of the column values weren't explained anywhere obvious. I had to dig 
+into the Kaggle discussion forum to find the data dictionary, and even then some variables like loan_type 
+and loan_purpose didn't have official definitions so those were interpreted based on community analysis 
+and standard mortgage industry conventions. 
+
+DATA PREPROCESSING
+----------------------
+Before doing anything with models I had to clean and prepare the data. Here's what I did and why:
+First I dropped ID and year because they don't actually tell you anything useful about whether someone 
+will default. ID is just a row number and year is just when the application was submitted.
+
+Then I checked for missing values. Most columns were fine but a few had a lot of gaps: rate_of_interest, 
+Interest_rate_spread, and Upfront_charges were all missing around 24-26% of their values, and dtir1 
+(debt-to-income ratio) was missing about 16%. I filled numeric columns with the median and categorical 
+columns with the most frequent value (mode). I used median instead of mean because median doesn't get 
+thrown off by extreme outliers the way mean does.
+ 
+Next was encoding. Machine learning models can only work with numbers, not text like "male" or "type1", 
+so I had to convert everything. For columns where the order actually means something (like Credit_Worthiness 
+where l1 is lower and l2 is higher), I manually assigned the numbers myself so the model understands the 
+ranking. For columns where the categories are just labels with no meaningful order (like Region or Gender), 
+I used LabelEncoder to let sklearn handle it.
+
+The age column was a special case because it was stored as ranges like "35-44" instead of actual numbers. 
+I wrote a function to convert each range to its midpoint so it could be used as a numeric feature. Finally, 
+I used StandardScaler to scale everything so no one column dominates the model just because its numbers 
+happen to be bigger than everyone else's.
+
+TARGET LEAKAGE AND FEATURE REMOVAL
+----------------------
+Okay so this is actually the most interesting part of the project. When I first ran Random Forest I got 
+99.99% accuracy. Every metric was 1.00. The confusion matrix showed it basically got everything right.
+That's not a good thing. No real model on real financial data is that perfect. I went back and looked at the 
+feature columns and realized the problem: rate_of_interest, Interest_rate_spread, and Upfront_charges were still 
+in my feature set. In real mortgage lending, lenders assign higher interest rates and spreads to loans they 
+already consider risky at the time of origination. So these columns were just reflecting a risk assessment that 
+had already been made. The model found this shortcut and used it to cheat, basically. This is called target leakage.
+I dropped those three columns and retrained everything. Accuracy dropped from 99.99% to 89.13% for Random Forest. 
+That lower number is actually the honest and correct result. A model that's too perfect is a model that's cheating.
+
+MODEL PERFORMANCE/RESULTS
+----------------------
+I trained two models on an 80/20 train-test split (about 119k rows for training, 30k held out for testing).
+
+Logistic Regression - 77.79% accuracy
+This one struggled with actually catching defaulters. It was great at correctly identifying people who wouldn't 
+default (97% recall for class 0) but it only caught 19% of people who actually did default. That means it missed 
+5,886 real defaults in the test set. From a bank's perspective that's really bad because those are loans that 
+would have been approved and then gone wrong.
+
+Random Forest - 89.13% accuracy
+This one did a lot better. It caught 60% of actual defaulters, which is still not perfect but way better than 19%. 
+It only misclassified 308 good borrowers as risky, and when it did flag someone as high-risk it was right 93% of the 
+time (precision). False negatives dropped from 5,886 to 2,925 compared to Logistic Regression.
+
+CONCLUSION 
+----------------------
+Random Forest is the recommended model for credit risk classification on this dataset. Higher accuracy, way better 
+at catching actual defaults, more balanced overall. In a credit risk context recall on the default class matters more 
+than almost any other metric because a missed default costs the bank real money. Random Forest's ability to build 100 
+decision trees and combine their votes lets it pick up on complex patterns that a simple linear model like Logistic 
+Regression just can't find.
+
+That said, 60% recall on defaults still means 40% of real defaulters are slipping through. In a production system you'd 
+want to either deal with the class imbalance (there are way more non-defaulters than defaulters in the dataset, which 
+biases both models), try a more powerful model like XGBoost, or adjust the decision threshold to prioritize catching 
+defaults even if it means more false alarms.
+
+WHAT I LEARNED
+----------------------
+Honestly the target leakage discovery was the biggest takeaway. A 99.99% accuracy sounds amazing until you realize it 
+means your model is cheating. Understanding why that happened because lenders embed risk assessments directly into loan 
+terms which required actually knowing what the data meant in the real world, not just treating it as numbers. That's why 
+I spent time going through the data dictionary and understanding what each column actually represents before touching the 
+model.
+
+The other thing I learned is that accuracy alone is a bad metric for imbalanced datasets. Logistic Regression got 78% 
+accuracy but only caught 19% of defaults. If the bank used that model it would feel like it was working fine while silently 
+missing almost every risky loan. Precision, recall, and the confusion matrix tell the real story.
+
